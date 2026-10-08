@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- La pagina no puede conectarse a ningun servidor: las notas nunca salen del telefono -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; worker-src 'self'; manifest-src 'self'; form-action 'none'; base-uri 'none'">
+<meta name="theme-color" content="#0f6b66">
+<meta name="description" content="Notas de colores y fichas de pacientes que funcionan sin internet.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+<title>Cuaderno</title>
+</head>
+<body>
+
+<!-- Bloqueo por PIN -->
+<div id="lock" class="lock" hidden>
+  <form id="lock-form" class="lock-box">
+    <img src="icons/icon-192.png" alt="" width="64" height="64">
+    <h1>Cuaderno</h1>
+    <p>Ingresá tu PIN</p>
+    <input id="lock-pin" type="password" inputmode="numeric" autocomplete="off" aria-label="PIN">
+    <p id="lock-err" class="err" hidden>PIN incorrecto.</p>
+    <button class="btn primary" type="submit">Entrar</button>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="top">
+    <h1 id="titulo-vista">Notas</h1>
+    <div class="top-actions" id="top-actions"></div>
+  </header>
+
+  <div id="update-banner" class="banner info" hidden>
+    Hay una versión nueva de la app. <button class="linklike" id="btn-actualizar">Actualizar ahora</button>
+  </div>
+  <div id="backup-banner" class="banner warn" hidden></div>
+
+  <main>
+    <!-- NOTAS -->
+    <section id="v-notas" class="vista">
+      <div class="toolbar">
+        <input id="q" type="search" placeholder="Buscar en las notas…" aria-label="Buscar">
+        <div class="toolbar-row">
+          <div class="colores-filtro" id="filtro-color" role="group" aria-label="Filtrar por color"></div>
+          <select id="orden" aria-label="Ordenar">
+            <option value="modificada">Últimas modificadas</option>
+            <option value="creada">Últimas creadas</option>
+            <option value="titulo">Alfabético</option>
+            <option value="color">Por color</option>
+          </select>
+          <button class="icon-btn" id="btn-vista" aria-label="Cambiar vista" title="Lista / cuadrícula"></button>
+        </div>
+      </div>
+      <div id="estado-notas" class="estado-notas" hidden></div>
+      <div id="lista-notas" class="notas"></div>
+    </section>
+
+    <!-- PREGUNTAR -->
+    <section id="v-preguntar" class="vista" hidden>
+      <div class="cn-barra">
+        <span id="cn-info"></span>
+        <label class="btn">Actualizar desde ColorNote<input type="file" id="file-colornote-2" hidden></label>
+      </div>
+      <form id="preg-form" class="preg-row">
+        <input id="preg-q" type="search" enterkeyhint="search" autocomplete="off" placeholder="¿Cuántos caballos de polo atendí en junio?" aria-label="Pregunta">
+        <button class="btn primary" type="submit">Preguntar</button>
+      </form>
+      <div class="ejemplos" id="preg-ejemplos"></div>
+      <div id="preg-res"></div>
+    </section>
+
+    <!-- CALENDARIO -->
+    <section id="v-calendario" class="vista" hidden>
+      <div class="cal-head">
+        <button class="icon-btn" id="cal-prev" aria-label="Mes anterior">‹</button>
+        <h2 id="cal-mes"></h2>
+        <button class="icon-btn" id="cal-next" aria-label="Mes siguiente">›</button>
+      </div>
+      <div class="cal" id="cal"></div>
+      <h3 id="cal-dia-titulo" class="sec"></h3>
+      <div id="cal-dia" class="notas lista"></div>
+    </section>
+
+    <!-- PACIENTES -->
+    <section id="v-pacientes" class="vista" hidden>
+      <div class="toolbar">
+        <input id="pq" type="search" placeholder="Buscar caballo, establecimiento u hallazgo…" aria-label="Buscar pacientes">
+        <div class="toolbar-row">
+          <select id="p-est" aria-label="Establecimiento"></select>
+          <select id="p-sev" aria-label="Gravedad"></select>
+        </div>
+      </div>
+      <div id="lista-pacientes"></div>
+    </section>
+
+    <!-- PANEL -->
+    <section id="v-panel" class="vista" hidden>
+      <div class="kpis" id="kpis"></div>
+      <div class="panels">
+        <div class="card"><h3 class="sec">Gravedad general</h3><div class="bars" id="ch-sev"></div></div>
+        <div class="card"><h3 class="sec">Hallazgos más frecuentes</h3><div class="bars" id="ch-hall"></div></div>
+        <div class="card"><h3 class="sec">Revisiones por establecimiento</h3><div class="bars" id="ch-est"></div></div>
+        <div class="card"><h3 class="sec">Para atender</h3><ul class="todo" id="todo"></ul></div>
+      </div>
+    </section>
+
+    <!-- MAS -->
+    <section id="v-mas" class="vista" hidden>
+      <div class="menu-list">
+        <button class="menu-item" data-ir="archivada"><span>Archivo</span><small id="n-archivo"></small></button>
+        <button class="menu-item" data-ir="papelera"><span>Papelera</span><small id="n-papelera"></small></button>
+      </div>
+
+      <div class="card stack">
+        <div>
+          <h2>Respaldo</h2>
+          <p class="hint" id="respaldo-info"></p>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="btn-respaldo">Guardar respaldo</button>
+          <label class="btn">Restaurar respaldo<input type="file" id="file-respaldo" accept=".json,application/json,text/plain" hidden></label>
+        </div>
+        <p class="hint small">En el celular, «Guardar respaldo» te deja mandarlo a Google Drive, WhatsApp o donde quieras. Con eso Claude Code lo puede leer desde tu computadora.</p>
+      </div>
+
+      <div class="card stack">
+        <div>
+          <h2>Traer notas de ColorNote</h2>
+          <p class="hint">Tus notas se siguen escribiendo y guardando en ColorNote; acá se trae una copia para poder hacerle preguntas. En ColorNote: Configuración → Respaldo → Respaldar. Después elegí ese archivo acá. Si nunca le pusiste contraseña a ColorNote, dejá 0000.</p>
+        </div>
+        <div class="row">
+          <input id="cn-pin" type="password" inputmode="numeric" value="0000" aria-label="Contraseña de ColorNote" style="max-width:120px">
+          <label class="btn primary">Elegir respaldo de ColorNote<input type="file" id="file-colornote" hidden></label>
+        </div>
+      </div>
+
+      <div class="card stack">
+        <div><h2>Disciplinas</h2><p class="hint" id="disc-info"></p></div>
+        <div class="row"><button class="btn" id="btn-disc">Disciplina de cada nota</button></div>
+      </div>
+
+      <div class="card stack">
+        <div><h2>Planilla de pacientes</h2><p class="hint">CSV con las columnas de «Revisiones Dentales - Miguel», para Excel o Google Sheets.</p></div>
+        <div class="row"><button class="btn" id="btn-csv">Exportar pacientes (.csv)</button></div>
+      </div>
+
+      <div class="card stack">
+        <div><h2>Seguridad</h2><p class="hint" id="pin-info"></p></div>
+        <div class="row" id="pin-acciones"></div>
+      </div>
+
+      <p class="hint small center" id="acerca"></p>
+    </section>
+  </main>
+
+  <button class="fab" id="fab" aria-label="Nueva nota">+</button>
+
+  <nav class="bottom" aria-label="Secciones">
+    <button data-v="preguntar" aria-current="page"><span class="ico">?</span>Preguntar</button>
+    <button data-v="notas"><span class="ico">▤</span>Notas</button>
+    <button data-v="calendario"><span class="ico">▦</span>Calendario</button>
+    <button data-v="pacientes"><span class="ico">◉</span>Pacientes</button>
+    <button data-v="panel"><span class="ico">▥</span>Panel</button>
+    <button data-v="mas"><span class="ico">⋯</span>Más</button>
+  </nav>
+</div>
+
+<!-- EDITOR DE NOTA (pantalla completa) -->
+<section id="editor" class="editor" hidden>
+  <header class="ed-top">
+    <button class="icon-btn" id="ed-volver" aria-label="Volver">←</button>
+    <div class="ed-actions">
+      <button class="icon-btn" id="ed-color" aria-label="Color">●</button>
+      <button class="icon-btn" id="ed-fijar" aria-label="Fijar arriba">📌</button>
+      <button class="icon-btn" id="ed-menu" aria-label="Más opciones">⋮</button>
+    </div>
+  </header>
+  <div class="ed-paleta" id="ed-paleta" hidden></div>
+  <div class="ed-menu card" id="ed-menu-box" hidden></div>
+  <div class="ed-body">
+    <div id="ed-fichas-banner" class="banner info" hidden></div>
+    <input id="ed-titulo" class="ed-titulo" placeholder="Título" aria-label="Título">
+    <div class="ed-meta"><label>Fecha <input type="date" id="ed-fecha"></label><label>Disciplina <select id="ed-disc"></select></label><span id="ed-fechas"></span></div>
+    <textarea id="ed-texto" class="ed-texto" placeholder="Escribí acá…" aria-label="Texto de la nota"></textarea>
+    <div id="ed-lista" class="ed-lista" hidden>
+      <ul id="ed-items"></ul>
+      <form id="ed-nuevo-item" class="ed-nuevo"><input id="ed-item-in" placeholder="+ Agregar ítem" aria-label="Nuevo ítem"></form>
+    </div>
+  </div>
+</section>
+
+<!-- DIALOGOS -->
+<dialog id="dlg-nueva" class="dlg-small">
+  <div class="body stack">
+    <h2>Nueva</h2>
+    <button class="menu-item" data-tipo="texto"><span>Nota de texto</span><small>Como en ColorNote</small></button>
+    <button class="menu-item" data-tipo="lista"><span>Lista de tareas</span><small>Con casillas para tildar</small></button>
+    <button class="menu-item" data-tipo="visita"><span>Visita a un establecimiento</span><small>Plantilla con fecha, lugar y caballos</small></button>
+  </div>
+  <div class="foot"><span></span><button class="btn" data-cerrar>Cancelar</button></div>
+</dialog>
+
+<dialog id="dlg-fichas">
+  <div class="body">
+    <h2 id="fichas-titulo"></h2>
+    <p class="hint" id="fichas-hint"></p>
+    <div class="defaults" id="fichas-defaults"></div>
+    <div class="recs" id="fichas"></div>
+  </div>
+  <div class="foot">
+    <button class="btn" data-cerrar>Cancelar</button>
+    <button class="btn primary" id="fichas-guardar">Guardar fichas</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-paciente">
+  <div class="body" id="paciente-body"></div>
+  <div class="foot" id="paciente-foot"></div>
+</dialog>
+
+<dialog id="dlg-disc">
+  <div class="body">
+    <h2>Disciplina de cada nota</h2>
+    <p class="hint">Elegí si los caballos de cada nota son de polo o de salto. Las fichas de esa nota toman la misma disciplina.</p>
+    <div id="disc-lista"></div>
+  </div>
+  <div class="foot"><span></span><button class="btn primary" data-cerrar>Listo</button></div>
+</dialog>
+
+<dialog id="dlg-import" class="dlg-small">
+  <div class="body stack" id="import-body"></div>
+  <div class="foot">
+    <button class="btn" data-cerrar>Cancelar</button>
+    <button class="btn primary" id="import-ok">Importar</button>
+  </div>
+</dialog>
+
+<dialog id="dlg-pin" class="dlg-small">
+  <form class="body stack" id="pin-form">
+    <h2 id="pin-titulo">Poner PIN</h2>
+    <p class="hint">Con PIN, las notas quedan cifradas en el teléfono. <b>Si te olvidás el PIN no hay forma de recuperarlas</b>: guardá un respaldo antes.</p>
+    <label>PIN nuevo (4 o más números)<input id="pin-1" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" required></label>
+    <label>Repetir PIN<input id="pin-2" type="password" inputmode="numeric" autocomplete="new-password" minlength="4" required></label>
+    <p id="pin-err" class="err" hidden></p>
+    <div class="row end"><button type="button" class="btn" data-cerrar>Cancelar</button><button class="btn primary" type="submit">Guardar PIN</button></div>
+  </form>
+</dialog>
+
+<datalist id="dl-est"></datalist>
+<div class="toast" id="toast" role="status"></div>
+
+<script src="store.js"></script>
+<script src="parser.js"></script>
+<script src="colornote.js"></script>
+<script src="preguntas.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

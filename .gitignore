@@ -1,0 +1,17 @@
+# Datos de pacientes: nunca se suben
+datos/
+*.backup
+*.dat
+*.csv
+cuaderno-respaldo-*.json
+*.cuaderno.json
+qr-cuaderno.png
+
+# Configuracion de esta computadora
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Sistema
+.DS_Store
+Thumbs.db
+__pycache__/
