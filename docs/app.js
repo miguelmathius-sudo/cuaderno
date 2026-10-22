@@ -1,5 +1,5 @@
 "use strict";
-const VERSION = "1.2.0"; // Mantener igual a CACHE en sw.js
+const VERSION = "1.3.0"; // Mantener igual a CACHE en sw.js
 const COLORES = ["rojo", "naranja", "amarillo", "verde", "azul", "violeta", "negro", "gris", "blanco"];
 const SEVS = Parser.SEVS;
 const ESTADOS = ["Realizada", "A confirmar"];
@@ -82,7 +82,7 @@ function normalizar(e) {
     n.creada = +n.creada || Date.now(); n.modificada = +n.modificada || n.creada;
     n.disciplina = DISCIPLINAS.includes(n.disciplina) ? n.disciplina : "";
   });
-  out.fichas.forEach((f) => { if (f) f.disciplina = DISCIPLINAS.includes(f.disciplina) ? f.disciplina : ""; });
+  out.fichas.forEach((f) => { if (f) { f.disciplina = DISCIPLINAS.includes(f.disciplina) ? f.disciplina : ""; f.cliente = String(f.cliente || ""); } });
   return out;
 }
 function mostrarLock() {
@@ -677,7 +677,7 @@ function todasLasVisitas() {
   const out = S.fichas.map((f) => {
     const n = porId.get(f.nota_id);
     if (f.nota_id) { if (!pasadas.has(f.nota_id)) pasadas.set(f.nota_id, new Set()); pasadas.get(f.nota_id).add(f.fecha); }
-    return { ...f, disciplina: f.disciplina || (n ? discNota(n) : ""), cliente: n ? n.titulo : "", revisada: true };
+    return { ...f, disciplina: f.disciplina || (n ? discNota(n) : ""), cliente: f.cliente || (n ? n.titulo : ""), revisada: true };
   });
   for (const n of S.notas) {
     if (n.tipo !== "texto" || n.estado === "papelera" || n.ejemplo) continue;
@@ -881,7 +881,7 @@ $("#file-respaldo").onchange = (e) => {
       let fn = 0;
       for (const f of fichas) {
         if (!f || !f.caballo) continue;
-        const rec = { id: f.id || uid("f"), fecha: f.fecha || "", establecimiento: f.establecimiento || "", caballo: f.caballo, oclusion: f.oclusion || "", hallazgos: f.hallazgos || "", severidad: SEVS.includes(f.severidad) ? f.severidad : "Confirmar", estado: ESTADOS.includes(f.estado) ? f.estado : "Realizada", proxima_accion: f.proxima_accion || "", disciplina: DISCIPLINAS.includes(f.disciplina) ? f.disciplina : "", veterinario: f.veterinario || "Miguel", fecha_carga: f.fecha_carga || hoy(), nota_id: f.nota_id || "", nota_original: f.nota_original || "" };
+        const rec = { id: f.id || uid("f"), fecha: f.fecha || "", establecimiento: f.establecimiento || "", cliente: f.cliente || "", caballo: f.caballo, oclusion: f.oclusion || "", hallazgos: f.hallazgos || "", severidad: SEVS.includes(f.severidad) ? f.severidad : "Confirmar", estado: ESTADOS.includes(f.estado) ? f.estado : "Realizada", proxima_accion: f.proxima_accion || "", disciplina: DISCIPLINAS.includes(f.disciplina) ? f.disciplina : "", veterinario: f.veterinario || "Miguel", fecha_carga: f.fecha_carga || hoy(), nota_id: f.nota_id || "", nota_original: f.nota_original || "" };
         const i = S.fichas.findIndex((x) => x.id === rec.id || clave(x) === clave(rec));
         if (i >= 0) S.fichas[i] = { ...rec, id: S.fichas[i].id }; else S.fichas.push(rec);
         fn++;

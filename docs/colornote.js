@@ -98,7 +98,8 @@ const ColorNote = (() => {
       color: COLORES[(o.color_index | 0) - 1] || "amarillo",
       fecha: +o.reminder_date > 0 ? fechaISO(+o.reminder_date) : "",
       fijada: false,
-      // space: 16 = archivo, 32 = papelera; active_state distinto de 0 = borrada. Verificar con un respaldo real.
+      // En el respaldo real de Miguel (oct 2026) space siempre es 0; active_state 16 = archivada y 32 = papelera.
+      // Miguel pidio que lo archivado tambien vaya a la papelera: son notas que dejo de usar.
       estado: o.space === 32 || +o.active_state > 0 ? "papelera" : o.space === 16 ? "archivada" : "activa",
       creada,
       modificada: +o.modified_date || creada,
@@ -110,7 +111,8 @@ const ColorNote = (() => {
     let plano;
     try { plano = await descifrar(buffer, pin || "0000"); }
     catch (e) { throw new Error(e.message && /chico/.test(e.message) ? e.message : "No se pudo descifrar el archivo."); }
-    const notas = leerTablas(plano).filter((o) => o && !o.auth_token && ("note" in o || "title" in o)).map(aNota);
+    // active_state 256 = ajustes internos de ColorNote ("syncable_settings"), no es una nota
+    const notas = leerTablas(plano).filter((o) => o && !o.auth_token && +o.active_state !== 256 && ("note" in o || "title" in o)).map(aNota);
     if (!notas.length) throw new Error("No encontré notas. Revisá el PIN de ColorNote (si nunca pusiste uno, es 0000).");
     return notas;
   }

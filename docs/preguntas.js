@@ -17,7 +17,7 @@ const Preguntas = (() => {
     "este esta estos estas ese esa eso todo toda todos todas durante desde hasta entre " +
     "ano anos mes meses semana dia dias fecha fechas hoy ayer pasado pasada ultimo ultima ultimos ultimas vez veces " +
     "visita visitas revision revisiones atencion atenciones lista listar mostrar mostrame decime dame ver buscar busca " +
-    "total cantidad numero disciplina polo salto saltos lugar lugares sitio sitios mas menos " +
+    "total cantidad numero disciplina polo salto saltos carrera carreras psc pura sangre lugar lugares sitio sitios mas menos " +
     "nuevo nuevos nueva nuevas reatendido reatendidos reatendida reatendidas repetido repetidos conocia conocias conocido conocidos antes primera primer").split(" "));
 
   const pad = (n) => String(n).padStart(2, "0");
@@ -89,7 +89,8 @@ const Preguntas = (() => {
     const r = t.replace(/(?:os|as|es|o|a|e|s)$/, "");
     return new RegExp(`\\b${r.length >= 3 ? r : t}(?:os|as|es|o|a|e|s)?\\b`);
   }
-  const clavePac = (v) => norm(v.establecimiento) + "|" + norm(v.caballo);
+  // Paciente = cliente + caballo (un cliente de polo mueve sus caballos entre lugares); sin cliente, lugar + caballo
+  const clavePac = (v) => norm(v.cliente || v.establecimiento) + "|" + norm(v.caballo);
   const distintos = (l) => new Set(l.map(clavePac)).size;
   function agrupar(lista, etiqueta) {
     const g = new Map();
@@ -106,7 +107,8 @@ const Preguntas = (() => {
     const p = periodo(q, hoy);
     const resto = p ? p.resto : q;
     const sinDisc = /\bsin disciplina\b/.test(resto);
-    const disciplina = sinDisc ? "" : /\bpolo\b/.test(resto) ? "Polo" : /\bsaltos?\b/.test(resto) ? "Salto" : "";
+    const disciplina = sinDisc ? "" : /\bpolo\b/.test(resto) ? "Polo" : /\bsaltos?\b/.test(resto) ? "Salto"
+      : /\bcarreras?\b|\bpsc\b|pura sangre|sangre pura/.test(resto) ? "Carrera" : "";
     const terminos = resto.replace(/[^a-z0-9 ]/g, " ").split(" ").filter((t) => t.length > 1 && !VACIAS.has(t));
     const res = terminos.map(reTermino);
     const texto = (v) => norm([v.caballo, v.establecimiento, v.cliente, v.hallazgos, v.oclusion, v.proxima_accion, /^(Severa|Moderada|Leve)$/.test(v.severidad) ? v.severidad : ""].join(" · "));

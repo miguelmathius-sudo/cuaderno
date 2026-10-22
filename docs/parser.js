@@ -8,7 +8,7 @@
 const Parser = (() => {
   const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
   const SEVS = ["Severa", "Moderada", "Leve", "Confirmar", "Sin hallazgos"];
-  const DISCIPLINAS = ["Polo", "Salto", "Otra"];
+  const DISCIPLINAS = ["Polo", "Salto", "Carrera", "Otra"]; // Carrera = pura sangre de carrera
   const HALLAZGOS = [
     ["Puntas", /punta/i],
     ["Lesión en carrillos", /carrillo/i],
@@ -58,9 +58,9 @@ const Parser = (() => {
   function lineaDisciplina(line, i) {
     const l = norm(line).replace(/[.:]+$/, "");
     let m = l.match(/^disciplina\s*:?\s*(.+)$/);
-    if (!m && i < 5) m = l.match(/^(?:caballos de |de )?(polo|salto)$/);
+    if (!m && i < 5) m = l.match(/^(?:caballos de |de )?(polo|salto|carreras?|psc|pura sangre(?: de carrera)?|sangre pura)$/);
     if (!m) return null;
-    return /polo/.test(m[1]) ? "Polo" : /salto/.test(m[1]) ? "Salto" : "Otra";
+    return /polo/.test(m[1]) ? "Polo" : /salto/.test(m[1]) ? "Salto" : /carrera|psc|sangre/.test(m[1]) ? "Carrera" : "Otra";
   }
   function disciplina(texto) {
     const lineas = String(texto || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
