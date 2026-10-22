@@ -17,7 +17,8 @@ const Preguntas = (() => {
     "este esta estos estas ese esa eso todo toda todos todas durante desde hasta entre " +
     "ano anos mes meses semana dia dias fecha fechas hoy ayer pasado pasada ultimo ultima ultimos ultimas vez veces " +
     "visita visitas revision revisiones atencion atenciones lista listar mostrar mostrame decime dame ver buscar busca " +
-    "total cantidad numero disciplina polo salto saltos").split(" "));
+    "total cantidad numero disciplina polo salto saltos lugar lugares sitio sitios mas menos " +
+    "nuevo nuevos nueva nuevas reatendido reatendidos reatendida reatendidas repetido repetidos conocia conocias conocido conocidos antes primera primer").split(" "));
 
   const pad = (n) => String(n).padStart(2, "0");
   const iso = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
@@ -113,18 +114,34 @@ const Preguntas = (() => {
     // Las visitas programadas que todavia no llegaron no cuentan como atendidas
     const base = visitas.filter((v) => v.fecha && !(v.estado === "A confirmar" && v.fecha > hoy)
       && (!p || (v.fecha >= p.desde && v.fecha <= p.hasta)) && res.every((r) => r.test(texto(v))));
-    const lista = base.filter((v) => (sinDisc ? !v.disciplina : !disciplina || v.disciplina === disciplina))
-      .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.caballo.localeCompare(b.caballo, "es"));
+    // Nuevo = su primera visita registrada cae dentro del periodo; si no, ya lo conocia (reatendido)
+    const primera = new Map();
+    for (const v of visitas) {
+      if (!v.fecha || (v.estado === "A confirmar" && v.fecha > hoy)) continue;
+      const k = clavePac(v);
+      if (!primera.has(k) || v.fecha < primera.get(k)) primera.set(k, v.fecha);
+    }
+    const soloNuevos = /\bnuev[oa]s?\b/.test(q), soloConocidos = /\b(reatendid|repetid|ya (?:los |las )?conoc|ya atendid)/.test(q);
+    let lista = base.filter((v) => (sinDisc ? !v.disciplina : !disciplina || v.disciplina === disciplina));
+    lista.forEach((v) => { v.nuevo = !!p && primera.get(clavePac(v)) >= p.desde; });
+    if (p && soloNuevos) lista = lista.filter((v) => v.nuevo);
+    if (p && soloConocidos) lista = lista.filter((v) => !v.nuevo);
+    lista.sort((a, b) => b.fecha.localeCompare(a.fecha) || a.caballo.localeCompare(b.caballo, "es"));
 
     const C = distintos(lista), R = lista.length;
     const E = new Set(lista.map((v) => norm(v.establecimiento))).size;
+    const tipo = p && soloNuevos ? " nuevos" : p && soloConocidos ? " que ya conocías" : "";
     const desc = (disciplina ? ` de ${disciplina.toLowerCase()}` : sinDisc ? " sin disciplina cargada" : "")
       + (terminos.length ? ` que coinciden con «${terminos.join(" ")}»` : "") + (p ? " " + p.txt : "");
+    const porCliente = agrupar(lista, (v) => v.cliente || v.establecimiento || "Sin cliente").sort((a, b) => b.n - a.n);
     let titular, detalle = "";
-    if (!R) titular = `No encontré visitas${desc}.`;
+    if (!R) titular = `No encontré caballos${tipo}${desc}.`;
     else if (cuenta) {
-      titular = `Atendiste ${pl(C, "caballo", "caballos")}${desc}.`;
-      detalle = `${R === 1 ? "Fue" : "Fueron"} ${pl(R, "revisión", "revisiones")} en ${pl(E, "establecimiento", "establecimientos")}.${p ? "" : " Cuenta todas las fechas cargadas."}`;
+      titular = `Atendiste ${pl(C, "caballo", "caballos")}${tipo}${desc}.`;
+      detalle = `${R === 1 ? "Fue" : "Fueron"} ${pl(R, "revisión", "revisiones")} en ${pl(E, "establecimiento", "establecimientos")}.`;
+      if (p && !soloNuevos && !soloConocidos) { const nu = distintos(lista.filter((v) => v.nuevo)); detalle += ` ${pl(nu, "era nuevo", "eran nuevos")} y ${C - nu} ya ${C - nu === 1 ? "lo" : "los"} habías atendido antes.`; }
+      if (porCliente.length > 1) detalle += ` Donde más: ${porCliente[0].label} (${pl(porCliente[0].n, "caballo", "caballos")}).`;
+      if (!p) detalle += soloNuevos || soloConocidos ? " Para separar nuevos de conocidos decime un período, por ejemplo «este año»." : " Cuenta todas las fechas cargadas.";
     } else if (C === 1) {
       const u = lista[0];
       titular = `Atendiste a ${u.caballo} (${u.establecimiento || "sin establecimiento"}) ${R === 1 ? "una vez" : R + " veces"}${p ? " " + p.txt : ""}.`;
@@ -141,6 +158,7 @@ const Preguntas = (() => {
       titular, detalle, cuenta, lista, terminos, disciplina, caballos: C,
       sinDisciplina: disciplina ? distintos(base.filter((v) => !v.disciplina)) : 0,
       sinRevisar: lista.filter((v) => !v.revisada).length,
+      porCliente: porCliente.slice(0, 15),
       porEst: agrupar(lista, (v) => v.establecimiento || "Sin establecimiento").sort((a, b) => b.n - a.n).slice(0, 12),
       porDisc: disciplina || sinDisc ? [] : agrupar(lista, (v) => v.disciplina || "Sin definir").sort((a, b) => b.n - a.n),
       porMes: porMes.length > 1 ? porMes : [],

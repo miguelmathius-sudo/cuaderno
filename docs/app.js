@@ -1,5 +1,5 @@
 "use strict";
-const VERSION = "1.1.0"; // Mantener igual a CACHE en sw.js
+const VERSION = "1.2.0"; // Mantener igual a CACHE en sw.js
 const COLORES = ["rojo", "naranja", "amarillo", "verde", "azul", "violeta", "negro", "gris", "blanco"];
 const SEVS = Parser.SEVS;
 const ESTADOS = ["Realizada", "A confirmar"];
@@ -712,20 +712,36 @@ function renderPreguntar() {
     if (enNotas.length) h += `<h3 class="sec">Aparece en estas notas</h3><ul class="todo">${enNotas.map((x) => `<li data-nota="${esc(x.nota_id)}"><span><b>${esc(x.titulo || "Sin título")}</b>${x.fecha ? ` <small>${fmtFecha(x.fecha)}</small>` : ""}<br><small>${esc(x.linea)}</small></span></li>`).join("")}</ul>`;
   }
   if (r.cuenta && r.lista.length) {
-    h += `<div class="panels">${r.porDisc.length ? `<div class="card"><h3 class="sec">Caballos por disciplina</h3><div class="bars" id="preg-disc"></div></div>` : ""}
+    h += `<div class="panels">${r.porCliente.length > 1 ? `<div class="card"><h3 class="sec">Caballos por cliente (título de la nota)</h3><div class="bars" id="preg-cli"></div></div>` : ""}${r.porDisc.length ? `<div class="card"><h3 class="sec">Caballos por disciplina</h3><div class="bars" id="preg-disc"></div></div>` : ""}
       <div class="card"><h3 class="sec">Caballos por establecimiento</h3><div class="bars" id="preg-est"></div></div>
       ${r.porMes.length ? `<div class="card"><h3 class="sec">Caballos por mes</h3><div class="bars" id="preg-mes"></div></div>` : ""}</div>`;
   }
   if (r.lista.length) {
     const tope = 80;
-    h += `<h3 class="sec">Revisiones${r.lista.length > tope ? ` (las ${tope} más recientes de ${r.lista.length})` : ""}</h3><ul class="todo">${r.lista.slice(0, tope).map((v, i) => `<li data-i="${i}"><span><b>${esc(v.caballo)}</b> <small>${esc(v.establecimiento)} · ${fmtFecha(v.fecha)}${v.disciplina ? " · " + esc(v.disciplina) : ""}</small><br><small>${esc(v.hallazgos || v.oclusion || "Sin hallazgos anotados")}</small></span><span class="pill ${v.revisada ? sevClass(v.severidad) : "sev-Sin"}">${esc(v.revisada ? sevLabel(v.severidad) : "Sin revisar")}</span></li>`).join("")}</ul>`;
+    h += `<h3 class="sec">Revisiones${r.lista.length > tope ? ` (las ${tope} más recientes de ${r.lista.length})` : ""}</h3><ul class="todo">${r.lista.slice(0, tope).map((v, i) => `<li data-i="${i}"><span><b>${esc(v.caballo)}</b> <small>${esc(v.establecimiento)} · ${fmtFecha(v.fecha)}${v.disciplina ? " · " + esc(v.disciplina) : ""}${v.nuevo ? " · nuevo" : ""}</small><br><small>${esc(v.hallazgos || v.oclusion || "Sin hallazgos anotados")}</small></span><span class="pill ${v.revisada ? sevClass(v.severidad) : "sev-Sin"}">${esc(v.revisada ? sevLabel(v.severidad) : "Sin revisar")}</span></li>`).join("")}</ul>`;
   }
   out.innerHTML = h;
+  if ($("#preg-cli")) barras($("#preg-cli"), r.porCliente);
   if ($("#preg-disc")) barras($("#preg-disc"), r.porDisc);
   if ($("#preg-est")) barras($("#preg-est"), r.porEst.map((x) => ({ ...x, color: colorEst(x.label) })));
   if ($("#preg-mes")) barras($("#preg-mes"), r.porMes);
 }
 $("#preg-form").addEventListener("submit", (e) => { e.preventDefault(); $("#preg-q").blur(); renderPreguntar(); });
+/* Dictado: lo reconoce Google, necesita internet. Solo viaja lo que se dice, no las notas. */
+const Reco = window.SpeechRecognition || window.webkitSpeechRecognition;
+let dictado = null;
+if (Reco) $("#preg-mic").hidden = false;
+$("#preg-mic").onclick = () => {
+  if (dictado) { dictado.stop(); return; }
+  if (!navigator.onLine) { toast("Para dictar hace falta internet. Sin señal, escribí la pregunta."); return; }
+  dictado = new Reco();
+  dictado.lang = "es-AR"; dictado.interimResults = true;
+  $("#preg-mic").classList.add("grabando"); toast("Hablá ahora…");
+  dictado.onresult = (e) => { $("#preg-q").value = [...e.results].map((x) => x[0].transcript).join(""); };
+  dictado.onerror = (e) => toast(e.error === "not-allowed" || e.error === "service-not-allowed" ? "Hay que darle permiso al micrófono." : e.error === "no-speech" ? "No escuché nada. Tocá el micrófono y hablá." : "No se pudo dictar. Probá de nuevo.");
+  dictado.onend = () => { dictado = null; $("#preg-mic").classList.remove("grabando"); renderPreguntar(); };
+  try { dictado.start(); } catch (err) { dictado = null; $("#preg-mic").classList.remove("grabando"); }
+};
 $("#preg-q").addEventListener("input", () => { clearTimeout(renderPreguntar._t); renderPreguntar._t = setTimeout(renderPreguntar, 350); });
 $("#preg-ejemplos").addEventListener("click", (e) => {
   const b = e.target.closest("button"); if (!b) return;

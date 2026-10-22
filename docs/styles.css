@@ -212,6 +212,8 @@ ul.todo small{color:var(--muted)}
 .cn-barra .btn{min-height:38px;padding:6px 12px;font-size:14px}
 .preg-row{display:flex;gap:8px;margin-bottom:10px}
 .preg-row input{flex:1}
+#preg-mic{padding:10px 12px;font-size:18px}
+#preg-mic.grabando{background:var(--sev-severa);border-color:var(--sev-severa)}
 .ejemplos{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin-bottom:12px;padding-bottom:2px}
 .ejemplos button{flex:none;appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:13.5px;cursor:pointer}
 .resp{margin-bottom:12px}
