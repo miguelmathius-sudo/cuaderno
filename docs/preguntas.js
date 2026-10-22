@@ -100,15 +100,23 @@ const Preguntas = (() => {
 
   /* visitas: [{fecha, establecimiento, caballo, hallazgos, oclusion, proxima_accion, severidad, estado, disciplina, cliente}]
      hoy: "AAAA-MM-DD". Devuelve null si la pregunta esta vacia. */
-  function responder(pregunta, visitas, hoy) {
+  function responder(pregunta, visitas, hoy, disciplinas = Parser.DISCIPLINAS) {
     const q = norm(pregunta).replace(/[¿?¡!.,;:()"«»]/g, " ").replace(/\s+/g, " ").trim();
     if (!q) return null;
     const cuenta = /\bcuant[oa]s?\b/.test(q);
     const p = periodo(q, hoy);
-    const resto = p ? p.resto : q;
+    let resto = p ? p.resto : q;
     const sinDisc = /\bsin disciplina\b/.test(resto);
-    const disciplina = sinDisc ? "" : /\bpolo\b/.test(resto) ? "Polo" : /\bsaltos?\b/.test(resto) ? "Salto"
-      : /\bcarreras?\b|\bpsc\b|pura sangre|sangre pura/.test(resto) ? "Carrera" : "";
+    // Disciplina: cualquiera de la lista (las fijas y las que agrego Miguel), en singular o plural
+    let disciplina = "";
+    if (!sinDisc) {
+      const m = resto.match(/\b(?:psc|pura sangre(?: de carrera)?|sangre pura)\b/);
+      if (m) { disciplina = "Carrera"; resto = resto.replace(m[0], " "); }
+      else for (const d of disciplinas.filter((x) => x !== "Otra")) {
+        const re = new RegExp(`\\b${norm(d).replace(/[^a-z0-9 ]/g, "")}(?:s|es)?\\b`);
+        if (re.test(resto)) { disciplina = d; resto = resto.replace(re, " "); break; }
+      }
+    }
     const terminos = resto.replace(/[^a-z0-9 ]/g, " ").split(" ").filter((t) => t.length > 1 && !VACIAS.has(t));
     const res = terminos.map(reTermino);
     const texto = (v) => norm([v.caballo, v.establecimiento, v.cliente, v.hallazgos, v.oclusion, v.proxima_accion, /^(Severa|Moderada|Leve)$/.test(v.severidad) ? v.severidad : ""].join(" · "));
@@ -133,7 +141,7 @@ const Preguntas = (() => {
     const C = distintos(lista), R = lista.length;
     const E = new Set(lista.map((v) => norm(v.establecimiento))).size;
     const tipo = p && soloNuevos ? " nuevos" : p && soloConocidos ? " que ya conocías" : "";
-    const desc = (disciplina ? ` de ${disciplina.toLowerCase()}` : sinDisc ? " sin disciplina cargada" : "")
+    const desc = (disciplina ? (disciplina === "Criollo" ? " criollos" : ` de ${disciplina.toLowerCase()}`) : sinDisc ? " sin disciplina cargada" : "")
       + (terminos.length ? ` que coinciden con «${terminos.join(" ")}»` : "") + (p ? " " + p.txt : "");
     const porCliente = agrupar(lista, (v) => v.cliente || v.establecimiento || "Sin cliente").sort((a, b) => b.n - a.n);
     let titular, detalle = "";

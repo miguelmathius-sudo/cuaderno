@@ -1,9 +1,15 @@
 "use strict";
-const VERSION = "1.3.0"; // Mantener igual a CACHE en sw.js
+const VERSION = "1.4.0"; // Mantener igual a CACHE en sw.js
 const COLORES = ["rojo", "naranja", "amarillo", "verde", "azul", "violeta", "negro", "gris", "blanco"];
 const SEVS = Parser.SEVS;
 const ESTADOS = ["Realizada", "A confirmar"];
-const DISCIPLINAS = Parser.DISCIPLINAS;
+let DISCIPLINAS = Parser.DISCIPLINAS;
+// Las fijas mas las que agrego Miguel en Mas -> Agregar disciplina
+function actualizarDisciplinas(ajustes) {
+  const extra = Array.isArray(ajustes && ajustes.disciplinasExtra) ? ajustes.disciplinasExtra : [];
+  DISCIPLINAS = [...Parser.DISCIPLINAS.filter((d) => d !== "Otra"), ...extra, "Otra"];
+  Parser.usar(DISCIPLINAS);
+}
 const GCOL = ["#0f8a82", "#c0463a", "#3b78c2", "#c7861c", "#7a5bb5", "#4a9a62", "#b5507e", "#6f7f35"];
 
 let S = nuevoEstado();
@@ -73,6 +79,7 @@ function arrancar(estado) {
 }
 function normalizar(e) {
   const base = nuevoEstado();
+  actualizarDisciplinas(e.ajustes);
   const out = { notas: Array.isArray(e.notas) ? e.notas : [], fichas: Array.isArray(e.fichas) ? e.fichas : [], ajustes: { ...base.ajustes, ...(e.ajustes || {}) } };
   out.notas.forEach((n) => {
     n.tipo = n.tipo === "lista" ? "lista" : "texto";
@@ -701,7 +708,7 @@ function renderPreguntar() {
   const imp = S.ajustes.ultimaImportacion, dias = imp ? Math.floor((Date.now() - imp) / 86400000) : 0;
   $("#cn-info").textContent = imp ? `Notas de ColorNote al ${fmtLarga(imp)}${dias >= 2 ? ` (hace ${dias} días)` : ""}` : "Todavía no trajiste tus notas de ColorNote.";
   const out = $("#preg-res");
-  const r = Preguntas.responder($("#preg-q").value, todasLasVisitas(), hoy());
+  const r = Preguntas.responder($("#preg-q").value, todasLasVisitas(), hoy(), DISCIPLINAS);
   pregLista = r ? r.lista : [];
   if (!r) { out.innerHTML = `<div class="vacio">Escribí o dictá una pregunta sobre tus visitas. Podés preguntar por mes, año, polo o salto, caballo, cliente, establecimiento o hallazgo. Funciona sin internet.</div>`; return; }
   let h = `<div class="card resp"><p class="resp-t">${esc(r.titular)}</p>${r.detalle ? `<p class="hint">${esc(r.detalle)}</p>` : ""}</div>`;
@@ -759,19 +766,54 @@ $("#preg-res").addEventListener("click", (e) => {
   if (v.revisada) abrirPaciente(clavePac(v)); else abrirNota(v.nota_id);
 });
 
+/* Lugares: las fichas ya ordenadas, agrupadas por lugar. Notas: las que tienen visitas sin ordenar. */
+function lugaresConFichas() {
+  const g = new Map();
+  for (const f of S.fichas) {
+    const k = f.establecimiento || "Sin lugar";
+    if (!g.has(k)) g.set(k, { lugar: k, fichas: [], caballos: new Set() });
+    g.get(k).fichas.push(f); g.get(k).caballos.add(norm(f.cliente) + "|" + norm(f.caballo));
+  }
+  return [...g.values()].map((x) => {
+    const ds = new Set(x.fichas.map((f) => f.disciplina || ""));
+    return { ...x, disciplina: ds.size === 1 ? [...ds][0] : "varias" };
+  });
+}
 function abrirDisciplinas() {
-  const filas = notasConCaballos().sort((a, b) => (discNota(a.nota) ? 1 : 0) - (discNota(b.nota) ? 1 : 0) || tituloNota(a.nota).localeCompare(tituloNota(b.nota), "es"));
-  $("#disc-lista").innerHTML = filas.length
-    ? filas.map(({ nota, caballos }) => `<div class="disc-fila"><span><b>${esc(tituloNota(nota))}</b><br><small>${caballos} caballo${caballos === 1 ? "" : "s"}</small></span>
-        <select data-nota="${esc(nota.id)}" aria-label="Disciplina de ${esc(tituloNota(nota))}">${opcionesDisc(nota)}</select></div>`).join("")
-    : `<div class="vacio">Todavía no hay notas con caballos.</div>`;
+  const sinFirst = (a, b) => (a ? 1 : 0) - (b ? 1 : 0);
+  const lugares = lugaresConFichas().sort((a, b) => sinFirst(a.disciplina, b.disciplina) || b.caballos.size - a.caballos.size);
+  const sinOrdenar = new Set(todasLasVisitas().filter((v) => !v.revisada).map((v) => v.nota_id));
+  const notas = notasConCaballos().filter((x) => sinOrdenar.has(x.nota.id))
+    .sort((a, b) => sinFirst(discNota(a.nota), discNota(b.nota)) || tituloNota(a.nota).localeCompare(tituloNota(b.nota), "es"));
+  const optsLugar = (d) => `<option value="">Sin definir</option>${d === "varias" ? `<option value="varias" selected>Varias</option>` : ""}` + opts(DISCIPLINAS, d);
+  let h = "";
+  if (lugares.length) h += `<h3 class="sec" style="margin-top:12px">Lugares (${lugares.length})</h3>` + lugares.map((x) => `<div class="disc-fila"><span><b>${esc(x.lugar)}</b><br><small>${x.caballos.size} caballo${x.caballos.size === 1 ? "" : "s"}</small></span>
+      <select data-lugar="${esc(x.lugar)}" aria-label="Disciplina de ${esc(x.lugar)}">${optsLugar(x.disciplina)}</select></div>`).join("");
+  if (notas.length) h += `<h3 class="sec" style="margin-top:16px">Notas sin ordenar (${notas.length})</h3>` + notas.map(({ nota, caballos }) => `<div class="disc-fila"><span><b>${esc(tituloNota(nota))}</b><br><small>${caballos} caballo${caballos === 1 ? "" : "s"}</small></span>
+      <select data-nota="${esc(nota.id)}" aria-label="Disciplina de ${esc(tituloNota(nota))}">${opcionesDisc(nota)}</select></div>`).join("");
+  $("#disc-lista").innerHTML = h || `<div class="vacio">Todavía no hay caballos cargados.</div>`;
   abrirDialogo($("#dlg-disc"));
 }
 $("#btn-disc").onclick = abrirDisciplinas;
 $("#disc-lista").addEventListener("change", (e) => {
+  const sl = e.target.closest("select[data-lugar]");
+  if (sl) {
+    if (sl.value === "varias") return;
+    S.fichas.forEach((f) => { if ((f.establecimiento || "Sin lugar") === sl.dataset.lugar) f.disciplina = sl.value; });
+    guardar(); return;
+  }
   const s = e.target.closest("select[data-nota]"), n = s && S.notas.find((x) => x.id === s.dataset.nota);
   if (n) ponerDisciplina(n, s.value);
 });
+$("#btn-disc-nueva").onclick = () => {
+  const nombre = (prompt("Nombre de la nueva disciplina (por ejemplo: Endurance)") || "").trim();
+  if (!nombre) return;
+  if (DISCIPLINAS.some((d) => norm(d) === norm(nombre))) { toast(`«${nombre}» ya está en la lista.`); return; }
+  const n = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  S.ajustes.disciplinasExtra = [...(S.ajustes.disciplinasExtra || []), n];
+  actualizarDisciplinas(S.ajustes); guardar(); renderMas();
+  toast(`Listo: «${n}» ya se puede elegir y preguntar.`);
+};
 $("#dlg-disc").addEventListener("close", () => renderVista());
 
 /* ---------------- calendario ---------------- */
@@ -821,8 +863,11 @@ function renderMas() {
   $("#respaldo-info").textContent = S.ajustes.ultimoRespaldo
     ? `Último respaldo: ${fmtLarga(S.ajustes.ultimoRespaldo)}. Los datos viven en este teléfono: si se pierde o se borra la app, el respaldo es lo único que queda.`
     : "Nunca guardaste un respaldo. Los datos viven en este teléfono: si se pierde o se borra la app, el respaldo es lo único que queda.";
-  const sinDisc = notasConCaballos().filter((x) => !discNota(x.nota)).length;
-  $("#disc-info").textContent = (sinDisc ? `${sinDisc} nota(s) con caballos todavía no tienen disciplina.` : "Todas las notas con caballos tienen disciplina.")
+  const sinOrdenar = new Set(todasLasVisitas().filter((v) => !v.revisada).map((v) => v.nota_id));
+  const sinDisc = notasConCaballos().filter((x) => sinOrdenar.has(x.nota.id) && !discNota(x.nota)).length;
+  const lugSin = lugaresConFichas().filter((x) => !x.disciplina).length;
+  const falta = [lugSin ? `${lugSin} lugar(es)` : "", sinDisc ? `${sinDisc} nota(s)` : ""].filter(Boolean).join(" y ");
+  $("#disc-info").textContent = `Disciplinas: ${DISCIPLINAS.join(", ")}. ` + (falta ? `Falta asignarla a ${falta}.` : "Todo tiene disciplina asignada.")
     + " Hace falta para preguntas como «¿cuántos caballos de polo atendí este año?».";
   const pin = Store.tienePin();
   $("#pin-info").textContent = pin ? "La app pide PIN al abrirla y las notas están cifradas en el teléfono." : "Sin PIN: cualquiera con tu teléfono desbloqueado puede leer las notas.";

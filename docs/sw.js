@@ -1,6 +1,6 @@
 /* Guarda la app en el telefono para que abra sin internet.
    Al publicar cambios, subir el numero de CACHE (y VERSION en app.js) para que el telefono se actualice. */
-const CACHE = "cuaderno-1.3.0";
+const CACHE = "cuaderno-1.4.0";
 const ARCHIVOS = [
   "./", "index.html", "styles.css", "store.js", "parser.js", "colornote.js", "preguntas.js", "app.js",
   "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png", "icons/icon-maskable-512.png",

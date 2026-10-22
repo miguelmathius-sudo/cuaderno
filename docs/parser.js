@@ -8,7 +8,8 @@
 const Parser = (() => {
   const MESES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
   const SEVS = ["Severa", "Moderada", "Leve", "Confirmar", "Sin hallazgos"];
-  const DISCIPLINAS = ["Polo", "Salto", "Carrera", "Otra"]; // Carrera = pura sangre de carrera
+  const DISCIPLINAS = ["Polo", "Salto", "Carrera", "Criollo", "Otra"]; // Carrera = pura sangre de carrera
+  let lista = DISCIPLINAS; // las fijas + las que agrega Miguel (usar())
   const HALLAZGOS = [
     ["Puntas", /punta/i],
     ["Lesión en carrillos", /carrillo/i],
@@ -53,18 +54,27 @@ const Parser = (() => {
     }
     return [line.trim(), ""];
   }
-  /* Disciplina escrita en la nota: "Polo" o "Salto" solos en uno de los primeros renglones,
-     o "Disciplina: polo" en cualquier parte. i = numero de renglon (sin contar los vacios). */
-  function lineaDisciplina(line, i) {
+  function usar(l) { lista = l; }
+  /* Nombre de disciplina a partir de un texto ya normalizado ("criollos" -> "Criollo", "psc" -> "Carrera") */
+  function cualDisciplina(t) {
+    t = t.replace(/^(?:caballos de |de )/, "").trim();
+    if (/^(psc|pura sangre(?: de carrera)?|sangre pura|carreras?)$/.test(t)) return "Carrera";
+    return lista.find((d) => { const n = norm(d); return t === n || t === n + "s" || t === n + "es"; }) || "";
+  }
+  /* Disciplina escrita en la nota: "Disciplina: polo" en cualquier parte, o el nombre solo en un renglon
+     antes de la primera fecha (despues ya pueden ser caballos: hay caballos que se llaman "Criollo"). */
+  function lineaDisciplina(line, antesDeFecha) {
     const l = norm(line).replace(/[.:]+$/, "");
-    let m = l.match(/^disciplina\s*:?\s*(.+)$/);
-    if (!m && i < 5) m = l.match(/^(?:caballos de |de )?(polo|salto|carreras?|psc|pura sangre(?: de carrera)?|sangre pura)$/);
-    if (!m) return null;
-    return /polo/.test(m[1]) ? "Polo" : /salto/.test(m[1]) ? "Salto" : /carrera|psc|sangre/.test(m[1]) ? "Carrera" : "Otra";
+    const m = l.match(/^disciplina\s*:?\s*(.+)$/);
+    if (m) return cualDisciplina(m[1]) || "Otra";
+    return antesDeFecha ? cualDisciplina(l) || null : null;
   }
   function disciplina(texto) {
-    const lineas = String(texto || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    for (let i = 0; i < lineas.length; i++) { const d = lineaDisciplina(lineas[i], i); if (d) return d; }
+    let antes = true;
+    for (const l of String(texto || "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean)) {
+      const d = lineaDisciplina(l, antes); if (d) return d;
+      if (fecha(l)) antes = false;
+    }
     return "";
   }
   function gravedades(texto) {
@@ -114,9 +124,9 @@ const Parser = (() => {
     const out = [], ignoradas = [];
     let f = "", est = "", cur = null;
     const cerrar = () => { if (cur) out.push(construir(cur, defs)); cur = null; };
-    for (const [i, line] of lineas.entries()) {
+    for (const line of lineas) {
       if (/^[_\-=—–]{4,}$/.test(line)) { cerrar(); continue; }
-      if (lineaDisciplina(line, i)) continue;
+      if (lineaDisciplina(line, !f)) continue;
       const fe = fecha(line, defs.anio);
       if (fe) { cerrar(); f = fe; continue; }
       const es = establecimiento(line);
@@ -154,5 +164,5 @@ const Parser = (() => {
     return "";
   }
 
-  return { leer, fecha, primeraFecha, piezas, gravedades, disciplina, norm, SEVS, DISCIPLINAS, HALLAZGOS };
+  return { leer, fecha, primeraFecha, piezas, gravedades, disciplina, cualDisciplina, usar, norm, SEVS, DISCIPLINAS, HALLAZGOS };
 })();
